@@ -1,4 +1,4 @@
-function [mean_velocity, SEM_velocity] = BIPN145_flytrack(diameter,varargin)
+function [mean_velocity, SEM_velocity, all_velocity] = BIPN145_flytrack(diameter,frame_rate,varargin)
 
 %% SCRIPT INFO
 % A short script to open an image and calculate the position of a fruit fly
@@ -12,7 +12,9 @@ function [mean_velocity, SEM_velocity] = BIPN145_flytrack(diameter,varargin)
 % diameter is diameter of dish in centimeters
 if  nargin == 0
     diameter = 4; %default diameter
+    frame_rate = 60; %default framerate
 end
+
 height = diameter;
 width = diameter;
 
@@ -82,7 +84,7 @@ for i = 1:num_files
     
     %% ANALYZE VIDEO AND SUBTRACT BACKGROUND
     
-    disp('Calculating fly positions (this part takes awhile...).');
+    disp('Calculating fly positions (this part takes a while...).');
     
     % re-define search parameters to make sense regardless of size
     threshold = (search_size)^2 * per_pixel_threshold;
@@ -139,8 +141,9 @@ for i = 1:num_files
     end
     
     %% MANUAL (TEMPORARY) FIX TO TIME AXIS
-    corrected_array(:,1) = corrected_array(:,1)/4;
-    
+    if frame_rate == 15
+        corrected_array(:,1) = corrected_array(:,1)/4;
+    end     
     %% PLOT FLY PATH
     figure('Name','Pathing map');
     x = corrected_array(:,2)';
@@ -166,7 +169,7 @@ for i = 1:num_files
     
     % How long is the assay (in seconds)? If one of the csv files is shorter
     % than this, defaults to the shorter time.
-    total_time = length(x)/15;
+    total_time = length(x)/frame_rate;
     
     % Bin size for velocity calculations (in seconds). Velocity is calculated
     % once per "bin size" by comparing positions at the start and end. Cannot
@@ -202,7 +205,8 @@ for i = 1:num_files
         throw(mexception);
     end
     velocity = zeros(seconds, 1);
-    velocity(:) = NaN;
+    % velocity(:) = NaN; % i'm not sure why this was setting to NaN - ALJ
+    
     for animal = 1:2:(size(replicate, 2) - 1)
         % calculate velocity/s for each animal
         for row = 1:dataRate:(size(replicate, 1) - dataRate)
@@ -223,9 +227,13 @@ for i = 1:num_files
         larvaNum = larvaNum + 1;
     end
     
-    % remove any absurd velocities that aren't actually possible (in this case over 1 cm/s)
-    meanVel(meanVel > 30) = NaN;
-    meanVel(meanVel < 0.4) = 0;
+    % remove any absurd velocities that aren't actually possible
+    if max(meanVel > 30)
+        disp('Warning: You have absurdly high velocities in this recording suggesting that the tracking is not working well.')
+        disp('Might I advise changing the selected ROI or re-recording your video?')
+    end
+    %meanVel(meanVel > 50) = NaN;
+    %meanVel(meanVel < 0.4) = 0;
     
     % find last datapoint and cut array down to size
     lastIdx = zeros(size(meanVel,2),1);
@@ -243,6 +251,7 @@ for i = 1:num_files
     
     % create a first column of timepoint labels
     plotData = horzcat((0:binSize:(size(meanVel,1) - 1) * binSize)', meanVel);
+    
     all_velocity(i,:) = plotData(:,2);
     
     %% PLOT DATA
@@ -260,7 +269,17 @@ for i = 1:num_files
     
     % legend(cleanLabels(file_list), 'location', 'NorthWest');
     
+%% FINAL DATA SUMMARY FOR THIS FILE
+mean_velocity = mean(meanVel);
+SEM_velocity = std(meanVel)/sqrt(seconds);
+
+disp('Mean velocity for this video is:')
+disp(mean_velocity)
+disp('SEM of velocity for this video is:')
+disp(SEM_velocity)    
+
 end
+
 
 %% COMBINED PLOTS
 if num_files > 1
@@ -278,13 +297,14 @@ if num_files > 1
     elseif num_files == 4
         legend({'Fly 1','Fly 2','Fly 3','Fly 4','Fly 5'})
     end
+
+    disp('Mean velocity ACROSS videos is:')
+    mean_velocity_all = mean(mean(all_velocity,2));
+    disp(mean_velocity_all)
+    disp('Standard deviation (NOT error) of mean velocity ACROSS videos is:')
+    SD_velocity_all = std(mean(all_velocity,2));
+    disp(SD_velocity_all)      
 end
-
-mean_velocity = mean(all_velocity,2);
-SEM_velocity = std(mean_velocity)/sqrt(num_files);
-
-disp(mean_velocity)
-disp(SEM_velocity)
 
 %% WRITE VELOCITY DATA TO DISC
 %
