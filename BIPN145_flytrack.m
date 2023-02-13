@@ -1,4 +1,4 @@
-function [mean_velocity, SEM_velocity, all_velocity] = BIPN145_flytrack(diameter,frame_rate,varargin)
+function [mean_velocity, std_velocity, all_velocity] = BIPN145_flytrack(diameter,frame_rate,varargin)
 
 %% SCRIPT INFO
 % A short script to open an image and calculate the position of a fruit fly
@@ -270,13 +270,13 @@ for i = 1:num_files
     % legend(cleanLabels(file_list), 'location', 'NorthWest');
     
 %% FINAL DATA SUMMARY FOR THIS FILE
-mean_velocity = mean(meanVel);
-SEM_velocity = std(meanVel)/sqrt(seconds);
+mean_velocity = mean(all_velocity);
+std_velocity = std(all_velocity);
 
 disp('Mean velocity for this video is:')
 disp(mean_velocity)
-disp('SEM of velocity for this video is:')
-disp(SEM_velocity)    
+disp('Standard deviation of velocity for this video is:')
+disp(std_velocity)    
 
 end
 
