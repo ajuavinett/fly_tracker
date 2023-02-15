@@ -6,7 +6,7 @@ function [mean_velocity, std_velocity, all_velocity] = BIPN145_flytrack(diameter
 % Written by Jeff Stafford. Some code and ideas from Dan
 % Valente's FTrack suite were used, as well as the 'Division' layer mode
 % formula from GIMP for background subtraction.
-% Modified by A Juavinett for BIPN 145
+% Modified by A Juavinett for BIPN 145 in February 2023
 
 %% INPUTS
 % diameter is diameter of dish in centimeters
@@ -270,8 +270,8 @@ for i = 1:num_files
     % legend(cleanLabels(file_list), 'location', 'NorthWest');
     
 %% FINAL DATA SUMMARY FOR THIS FILE
-mean_velocity = mean(all_velocity);
-std_velocity = std(all_velocity);
+mean_velocity = mean(all_velocity,'omitnan');
+std_velocity = std(all_velocity,'omitnan');
 
 disp('Mean velocity for this video is:')
 disp(mean_velocity)
@@ -299,10 +299,10 @@ if num_files > 1
     end
 
     disp('Mean velocity ACROSS videos is:')
-    mean_velocity_all = mean(mean(all_velocity,2));
+    mean_velocity_all = mean(mean(all_velocity,2,'omitnan'));
     disp(mean_velocity_all)
     disp('Standard deviation (NOT error) of mean velocity ACROSS videos is:')
-    SD_velocity_all = std(mean(all_velocity,2));
+    SD_velocity_all = std(mean(all_velocity,2,'omitnan'));
     disp(SD_velocity_all)      
 end
 
