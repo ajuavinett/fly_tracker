@@ -9,6 +9,8 @@ Original MATLAB code by Jeff Stafford, modified by A. Juavinett for BIPN 145.
 Python port for standalone use.
 
 Usage:
+    python BIPN145_flytrack.py                  # interactive mode (file picker + prompts)
+    python BIPN145_flytrack.py video1.avi       # command-line mode with defaults
     python BIPN145_flytrack.py video1.avi video2.avi --diameter 4 --frame-rate 30
 """
 
@@ -393,44 +395,110 @@ def plot_all_velocities(all_velocity, bin_size):
 # Main
 # ---------------------------------------------------------------------------
 
+def prompt_param(name, default, cast=float):
+    """Prompt the user for a parameter, returning default if they press Enter."""
+    raw = input(f"  {name} [{default}]: ").strip()
+    if raw == "":
+        return cast(default)
+    return cast(raw)
+
+
+def interactive_mode():
+    """
+    Fully interactive mode: file picker + prompted parameters.
+    Returns (video_files, diameter, frame_rate, bin_size, search_size, threshold).
+    """
+    print("\n=== BIPN 145 Fly Tracker ===\n")
+
+    # --- File picker using tkinter ---
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()  # hide the root window
+        root.attributes("-topmost", True)  # bring dialog to front
+        print("Select your video file(s) in the file dialog...")
+        video_files = list(filedialog.askopenfilenames(
+            title="Select video(s) to analyze",
+            filetypes=[
+                ("Video files", "*.avi *.mp4 *.mov *.mkv *.mj2 *.mpg *.m4v"),
+                ("All files", "*.*"),
+            ],
+        ))
+        root.destroy()
+    except Exception:
+        # Fallback if tkinter is unavailable (rare, but possible on some Linux)
+        print("Could not open file dialog. Enter video path(s) manually.")
+        paths = input("Video file path(s), separated by commas: ").strip()
+        video_files = [p.strip() for p in paths.split(",") if p.strip()]
+
+    if not video_files:
+        print("No files selected. Exiting.")
+        sys.exit(0)
+
+    print(f"\n{len(video_files)} file(s) selected:")
+    for vf in video_files:
+        print(f"  • {os.path.basename(vf)}")
+
+    # --- Prompt for parameters (Enter accepts default) ---
+    print("\nSet parameters (press Enter to accept default):\n")
+    diameter = prompt_param("Dish diameter in cm", 4, float)
+    frame_rate = prompt_param("Frame rate (fps)", 30, int)
+    bin_size = prompt_param("Velocity bin size (s)", 1, float)
+    search_size = prompt_param("Search size (px)", 20, int)
+    threshold = prompt_param("Per-pixel threshold", 1.5, float)
+
+    return video_files, diameter, frame_rate, bin_size, search_size, threshold
+
+
 def main():
-    parser = argparse.ArgumentParser(
-        description="BIPN 145 Fly Tracker — track fly position and velocity from video."
-    )
-    parser.add_argument("videos", nargs="+", help="Video file(s) to analyze")
-    parser.add_argument("--diameter", type=float, default=4,
-                        help="Diameter of the dish in cm (default: 4)")
-    parser.add_argument("--frame-rate", type=int, default=30,
-                        help="Frame rate in fps (default: 30)")
-    parser.add_argument("--bin-size", type=float, default=1,
-                        help="Velocity bin size in seconds (default: 1)")
-    parser.add_argument("--search-size", type=int, default=20,
-                        help="Search area size in pixels (default: 20)")
-    parser.add_argument("--threshold", type=float, default=1.5,
-                        help="Per-pixel intensity threshold (default: 1.5)")
-    args = parser.parse_args()
+    # If no arguments provided, run in interactive mode
+    if len(sys.argv) == 1:
+        video_files, diameter, frame_rate, bin_size, search_size, threshold = interactive_mode()
+    else:
+        parser = argparse.ArgumentParser(
+            description="BIPN 145 Fly Tracker — track fly position and velocity from video."
+        )
+        parser.add_argument("videos", nargs="+", help="Video file(s) to analyze")
+        parser.add_argument("--diameter", type=float, default=4,
+                            help="Diameter of the dish in cm (default: 4)")
+        parser.add_argument("--frame-rate", type=int, default=30,
+                            help="Frame rate in fps (default: 30)")
+        parser.add_argument("--bin-size", type=float, default=1,
+                            help="Velocity bin size in seconds (default: 1)")
+        parser.add_argument("--search-size", type=int, default=20,
+                            help="Search area size in pixels (default: 20)")
+        parser.add_argument("--threshold", type=float, default=1.5,
+                            help="Per-pixel intensity threshold (default: 1.5)")
+        args = parser.parse_args()
+        video_files = args.videos
+        diameter = args.diameter
+        frame_rate = args.frame_rate
+        bin_size = args.bin_size
+        search_size = args.search_size
+        threshold = args.threshold
 
     # Validate video files exist
-    for vf in args.videos:
+    for vf in video_files:
         if not os.path.isfile(vf):
             print(f"Error: file not found: {vf}")
             sys.exit(1)
 
-    print(f"{len(args.videos)} video(s) selected for analysis.")
-    print(f"  Diameter: {args.diameter} cm, Frame rate: {args.frame_rate} fps")
-    print(f"  Bin size: {args.bin_size} s, Search size: {args.search_size} px")
+    print(f"\n{len(video_files)} video(s) selected for analysis.")
+    print(f"  Diameter: {diameter} cm, Frame rate: {frame_rate} fps")
+    print(f"  Bin size: {bin_size} s, Search size: {search_size} px")
 
     # Select ROI from the first video
-    roi = select_roi(args.videos[0])
+    roi = select_roi(video_files[0])
     print(f"ROI: x={roi[0]}, y={roi[1]}, w={roi[2]}, h={roi[3]}")
 
     # Process all videos
     all_corrected = []
     all_velocity = []
 
-    for vf in args.videos:
-        corrected = process_video(vf, roi, args.diameter, args.frame_rate,
-                                  args.search_size, args.threshold)
+    for vf in video_files:
+        corrected = process_video(vf, roi, diameter, frame_rate,
+                                  search_size, threshold)
         all_corrected.append(corrected)
 
         # Save tracking CSV
@@ -441,7 +509,7 @@ def main():
         print(f"  Saved {csv_name}")
 
         # Calculate velocity
-        time_axis, velocity = calculate_velocity(corrected, args.frame_rate, args.bin_size)
+        time_axis, velocity = calculate_velocity(corrected, frame_rate, bin_size)
         all_velocity.append(velocity)
 
         # Warn about absurd velocities
@@ -463,8 +531,8 @@ def main():
         print(f"  Saved {vel_csv}")
 
         # Plot
-        plot_path(corrected, os.path.basename(vf), args.diameter)
-        plot_velocity(time_axis, velocity, os.path.basename(vf), args.bin_size)
+        plot_path(corrected, os.path.basename(vf), diameter)
+        plot_velocity(time_axis, velocity, os.path.basename(vf), bin_size)
 
     # Summary across videos
     num_files = len(all_velocity)
@@ -475,7 +543,7 @@ def main():
         print(f"\n=== Summary Across {num_files} Videos ===")
         print(f"Mean velocity across videos: {mean_across:.2f} mm/s")
         print(f"SD of mean velocity across videos: {sd_across:.2f} mm/s")
-        plot_all_velocities(all_velocity, args.bin_size)
+        plot_all_velocities(all_velocity, bin_size)
     else:
         mean_vel = np.nanmean(all_velocity[0])
         sd_vel = np.nanstd(all_velocity[0])
