@@ -9,9 +9,9 @@ Original MATLAB code by Jeff Stafford, modified by A. Juavinett for BIPN 145.
 Python port for standalone use.
 
 Usage:
-    python BIPN145_flytrack.py                  # interactive mode (file picker + prompts)
+    python BIPN145_flytrack.py                  # interactive mode (file picker)
     python BIPN145_flytrack.py video1.avi       # command-line mode with defaults
-    python BIPN145_flytrack.py video1.avi video2.avi --diameter 4 --frame-rate 30
+    python BIPN145_flytrack.py video1.avi video2.avi --diameter 4 --frame-rate 15
 """
 
 import argparse
@@ -189,9 +189,22 @@ def process_video(video_path, roi, diameter, frame_rate, search_size, per_pixel_
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     nfrm = total_frames - 1
 
-    print(f"\nProcessing: {os.path.basename(video_path)}")
-    print(f"  Video FPS: {fps}, Total frames: {total_frames}")
-    print(f"  Using frame_rate parameter: {frame_rate} for time conversion")
+    # Auto-detect frame rate from video if not specified
+    if frame_rate is None:
+        frame_rate = round(fps)
+        print(f"\nProcessing: {os.path.basename(video_path)}")
+        print(f"  Auto-detected frame rate: {frame_rate} fps ({total_frames} frames)")
+    else:
+        print(f"\nProcessing: {os.path.basename(video_path)}")
+        print(f"  Video FPS: {fps}, using override: {frame_rate} fps ({total_frames} frames)")
+
+    # Sanity check: warn if video duration seems unusual
+    if frame_rate > 0:
+        duration = total_frames / frame_rate
+        print(f"  Estimated duration: {duration:.1f} seconds")
+        if duration < 50 or duration > 70:
+            print(f"  WARNING: Expected ~60s video but got {duration:.1f}s.")
+            print(f"    If this looks wrong, re-run with --frame-rate to override.")
 
     # --- Create background from 100 random frames ---
     print("  Calculating background...")
@@ -262,10 +275,6 @@ def process_video(video_path, roi, diameter, frame_rate, search_size, per_pixel_
     # Apply teleport filter and interpolation
     corrected_array = dist_filter(corrected_array, 2)
     corrected_array = interpolate_pos(corrected_array, 2)
-
-    # Manual fix for 15fps videos (matching MATLAB behavior)
-    if frame_rate == 15:
-        corrected_array[:, 0] = corrected_array[:, 0] / 4
 
     return corrected_array
 
@@ -379,18 +388,11 @@ def plot_all_velocities(all_velocity, bin_size):
 # Main
 # ---------------------------------------------------------------------------
 
-def prompt_param(name, default, cast=float):
-    """Prompt the user for a parameter, returning default if they press Enter."""
-    raw = input(f"  {name} [{default}]: ").strip()
-    if raw == "":
-        return cast(default)
-    return cast(raw)
-
-
 def interactive_mode():
     """
-    Fully interactive mode: file picker + prompted parameters.
+    Fully interactive mode: file picker, no prompts.
     Returns (video_files, diameter, frame_rate, bin_size, search_size, threshold).
+    Frame rate is auto-detected from the video, so frame_rate=None here.
     """
     print("\n=== BIPN 145 Fly Tracker ===\n")
 
@@ -424,11 +426,8 @@ def interactive_mode():
     for vf in video_files:
         print(f"  • {os.path.basename(vf)}")
 
-    # --- Prompt for parameters (Enter accepts default) ---
-    print("\nSet parameters (press Enter to accept default):\n")
-    frame_rate = prompt_param("Frame rate (fps)", 15, int)
-
-    # Fixed defaults
+    # Fixed defaults — frame rate auto-detected from video
+    frame_rate = None
     diameter = 4.0
     bin_size = 1.0
     search_size = 20
@@ -448,8 +447,8 @@ def main():
         parser.add_argument("videos", nargs="+", help="Video file(s) to analyze")
         parser.add_argument("--diameter", type=float, default=4,
                             help="Diameter of the dish in cm (default: 4)")
-        parser.add_argument("--frame-rate", type=int, default=15,
-                            help="Frame rate in fps (default: 15)")
+        parser.add_argument("--frame-rate", type=int, default=None,
+                            help="Frame rate in fps (default: auto-detect from video)")
         parser.add_argument("--bin-size", type=float, default=1,
                             help="Velocity bin size in seconds (default: 1)")
         parser.add_argument("--search-size", type=int, default=20,
@@ -471,7 +470,7 @@ def main():
             sys.exit(1)
 
     print(f"\n{len(video_files)} video(s) selected for analysis.")
-    print(f"  Diameter: {diameter} cm, Frame rate: {frame_rate} fps")
+    print(f"  Diameter: {diameter} cm, Frame rate: {'auto-detect' if frame_rate is None else f'{frame_rate} fps'}")
     print(f"  Bin size: {bin_size} s, Search size: {search_size} px")
 
     # Select ROI from the first video
