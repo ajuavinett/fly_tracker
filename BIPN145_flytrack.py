@@ -24,7 +24,7 @@ def check_install(package, import_name=None):
         __import__(import_name or package)
     except ImportError:
         print(f"Installing {package}...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", package])
 
 
 check_install("numpy")
