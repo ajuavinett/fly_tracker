@@ -27,20 +27,14 @@ def check_install(package, import_name=None):
 
 check_install("numpy")
 check_install("opencv-python", "cv2")
+check_install("matplotlib")
 
 import argparse
 import os
 import numpy as np
 import cv2
-
-# matplotlib is optional — plots are skipped if not available
-try:
-    import matplotlib.pyplot as plt
-    from matplotlib.collections import LineCollection
-    HAS_MPL = True
-except ImportError:
-    HAS_MPL = False
-    print("Note: matplotlib not found. Plots will be skipped; CSVs will still be saved.")
+import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
 
 
 # ---------------------------------------------------------------------------
@@ -328,14 +322,11 @@ def calculate_velocity(corrected, frame_rate, bin_size):
 
 
 # ---------------------------------------------------------------------------
-# Plotting (optional — requires matplotlib)
+# Plotting
 # ---------------------------------------------------------------------------
 
 def plot_path(corrected, video_name, diameter):
     """Plot the fly path color-coded by time."""
-    if not HAS_MPL:
-        return
-
     x = corrected[:, 1]
     y = corrected[:, 2]
     t = corrected[:, 0]
@@ -365,9 +356,6 @@ def plot_path(corrected, video_name, diameter):
 
 def plot_velocity(time_axis, velocity, video_name, bin_size):
     """Plot velocity over time for a single video."""
-    if not HAS_MPL:
-        return
-
     fig, ax = plt.subplots(figsize=(10, 4))
     ax.plot(time_axis, velocity, linewidth=1.5)
     ax.set_xlim(0, time_axis[-1] + bin_size if len(time_axis) > 0 else 1)
@@ -382,7 +370,7 @@ def plot_velocity(time_axis, velocity, video_name, bin_size):
 
 def plot_all_velocities(all_velocity, bin_size):
     """Plot all fly velocities on one figure."""
-    if not HAS_MPL or len(all_velocity) < 2:
+    if len(all_velocity) < 2:
         return
 
     max_len = max(len(v) for v in all_velocity)
