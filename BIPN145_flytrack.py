@@ -14,27 +14,9 @@ Usage:
     python BIPN145_flytrack.py video1.avi video2.avi --diameter 4 --frame-rate 30
 """
 
-# --- Dependency check: auto-install if missing ---
-import subprocess
-import sys
-
-
-def check_install(package, import_name=None):
-    try:
-        __import__(import_name or package)
-    except ImportError:
-        print(f"Installing {package}...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", package])
-        import importlib
-        importlib.invalidate_caches()
-
-
-check_install("numpy")
-check_install("opencv-python", "cv2")
-check_install("matplotlib")
-
 import argparse
 import os
+import sys
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
