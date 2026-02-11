@@ -25,6 +25,8 @@ def check_install(package, import_name=None):
     except ImportError:
         print(f"Installing {package}...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", package])
+        import importlib
+        importlib.invalidate_caches()
 
 
 check_install("numpy")
@@ -353,7 +355,7 @@ def plot_path(corrected, video_name, diameter):
     cbar.set_label("Time (s)")
 
     plt.tight_layout()
-    plt.show()
+    plt.show(block=False)
 
 
 def plot_velocity(time_axis, velocity, video_name, bin_size):
@@ -367,7 +369,7 @@ def plot_velocity(time_axis, velocity, video_name, bin_size):
     ax.set_ylabel("Velocity (mm/s)", fontsize=11)
     ax.set_title(f"Fly Velocity — {video_name}")
     plt.tight_layout()
-    plt.show()
+    plt.show(block=False)
 
 
 def plot_all_velocities(all_velocity, bin_size):
@@ -388,7 +390,7 @@ def plot_all_velocities(all_velocity, bin_size):
     ax.set_title("All Fly Velocities")
     ax.legend()
     plt.tight_layout()
-    plt.show()
+    plt.show(block=False)
 
 
 # ---------------------------------------------------------------------------
@@ -442,11 +444,13 @@ def interactive_mode():
 
     # --- Prompt for parameters (Enter accepts default) ---
     print("\nSet parameters (press Enter to accept default):\n")
-    diameter = prompt_param("Dish diameter in cm", 4, float)
-    frame_rate = prompt_param("Frame rate (fps)", 30, int)
-    bin_size = prompt_param("Velocity bin size (s)", 1, float)
-    search_size = prompt_param("Search size (px)", 20, int)
-    threshold = prompt_param("Per-pixel threshold", 1.5, float)
+    frame_rate = prompt_param("Frame rate (fps)", 15, int)
+
+    # Fixed defaults
+    diameter = 4.0
+    bin_size = 1.0
+    search_size = 20
+    threshold = 1.5
 
     return video_files, diameter, frame_rate, bin_size, search_size, threshold
 
@@ -462,8 +466,8 @@ def main():
         parser.add_argument("videos", nargs="+", help="Video file(s) to analyze")
         parser.add_argument("--diameter", type=float, default=4,
                             help="Diameter of the dish in cm (default: 4)")
-        parser.add_argument("--frame-rate", type=int, default=30,
-                            help="Frame rate in fps (default: 30)")
+        parser.add_argument("--frame-rate", type=int, default=15,
+                            help="Frame rate in fps (default: 15)")
         parser.add_argument("--bin-size", type=float, default=1,
                             help="Velocity bin size in seconds (default: 1)")
         parser.add_argument("--search-size", type=int, default=20,
@@ -551,7 +555,8 @@ def main():
         print(f"Mean velocity: {mean_vel:.2f} mm/s")
         print(f"SD of velocity: {sd_vel:.2f} mm/s")
 
-    print("\nDone!")
+    print("\nDone! Close the figure windows when you're finished viewing them.")
+    plt.show()  # Block here so all figure windows stay open
 
 
 if __name__ == "__main__":
