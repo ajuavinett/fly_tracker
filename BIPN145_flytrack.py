@@ -243,7 +243,7 @@ def select_roi(video_path):
 def process_video(video_path, roi, diameter, frame_rate, search_size, per_pixel_threshold):
     """
     Process a single fly video and return the corrected position array.
-    Returns Nx3 array [time_s, x_cm, y_cm].
+    Returns (Nx3 array [time_s, x_cm, y_cm], frame_rate).
     """
     height = diameter
     width = diameter
@@ -256,9 +256,15 @@ def process_video(video_path, roi, diameter, frame_rate, search_size, per_pixel_
 
     # Auto-detect frame rate from video if not specified
     if frame_rate is None:
-        frame_rate = round(fps)
-        print(f"\nProcessing: {os.path.basename(video_path)}")
-        print(f"  Auto-detected frame rate: {frame_rate} fps ({total_frames} frames)")
+        if fps > 0:
+            frame_rate = round(fps)
+            print(f"\nProcessing: {os.path.basename(video_path)}")
+            print(f"  Auto-detected frame rate: {frame_rate} fps ({total_frames} frames)")
+        else:
+            frame_rate = 30
+            print(f"\nProcessing: {os.path.basename(video_path)}")
+            print(f"  WARNING: Could not detect frame rate, using default: {frame_rate} fps")
+            print(f"    Re-run with --frame-rate to set the correct value.")
     else:
         print(f"\nProcessing: {os.path.basename(video_path)}")
         print(f"  Video FPS: {fps}, using override: {frame_rate} fps ({total_frames} frames)")
@@ -343,7 +349,7 @@ def process_video(video_path, roi, diameter, frame_rate, search_size, per_pixel_
     corrected_array = dist_filter(corrected_array, 2)
     corrected_array = interpolate_pos(corrected_array, 2)
 
-    return corrected_array
+    return corrected_array, frame_rate
 
 
 # ---------------------------------------------------------------------------
@@ -549,8 +555,8 @@ def main():
     all_velocity = []
 
     for vf in video_files:
-        corrected = process_video(vf, roi, diameter, frame_rate,
-                                  search_size, threshold)
+        corrected, detected_fps = process_video(vf, roi, diameter, frame_rate,
+                                                search_size, threshold)
         all_corrected.append(corrected)
 
         # Save tracking CSV
@@ -561,7 +567,7 @@ def main():
         print(f"  Saved {csv_name}")
 
         # Calculate velocity
-        time_axis, velocity = calculate_velocity(corrected, frame_rate, bin_size)
+        time_axis, velocity = calculate_velocity(corrected, detected_fps, bin_size)
         all_velocity.append(velocity)
 
         # Warn about absurd velocities
