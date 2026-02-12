@@ -393,7 +393,7 @@ def calculate_velocity(corrected, frame_rate, bin_size):
 # Plotting
 # ---------------------------------------------------------------------------
 
-def plot_path(corrected, video_name, diameter):
+def plot_path(corrected, video_name, diameter, save_path=None):
     """Plot the fly path color-coded by time."""
     x = corrected[:, 1]
     y = corrected[:, 2]
@@ -419,10 +419,13 @@ def plot_path(corrected, video_name, diameter):
     cbar.set_label("Time (s)")
 
     plt.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        print(f"  Saved {save_path}")
     plt.show(block=False)
 
 
-def plot_velocity(time_axis, velocity, video_name, bin_size):
+def plot_velocity(time_axis, velocity, video_name, bin_size, save_path=None):
     """Plot velocity over time for a single video."""
     fig, ax = plt.subplots(figsize=(10, 4))
     ax.plot(time_axis, velocity, linewidth=1.5)
@@ -433,10 +436,13 @@ def plot_velocity(time_axis, velocity, video_name, bin_size):
     ax.set_ylabel("Velocity (mm/s)", fontsize=11)
     ax.set_title(f"Fly Velocity — {video_name}")
     plt.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        print(f"  Saved {save_path}")
     plt.show(block=False)
 
 
-def plot_all_velocities(all_velocity, bin_size):
+def plot_all_velocities(all_velocity, bin_size, save_path=None):
     """Plot all fly velocities on one figure."""
     if len(all_velocity) < 2:
         return
@@ -454,6 +460,9 @@ def plot_all_velocities(all_velocity, bin_size):
     ax.set_title("All Fly Velocities")
     ax.legend()
     plt.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        print(f"  Saved {save_path}")
     plt.show(block=False)
 
 
@@ -588,9 +597,11 @@ def main():
                    header="Time_s,Velocity_mm_per_s", comments="")
         print(f"  Saved {vel_csv}")
 
-        # Plot
-        plot_path(corrected, os.path.basename(vf), diameter)
-        plot_velocity(time_axis, velocity, os.path.basename(vf), bin_size)
+        # Plot and save figures
+        plot_path(corrected, os.path.basename(vf), diameter,
+                  save_path=f"{base}_path.png")
+        plot_velocity(time_axis, velocity, os.path.basename(vf), bin_size,
+                      save_path=f"{base}_velocity.png")
 
     # Summary across videos
     num_files = len(all_velocity)
@@ -601,7 +612,8 @@ def main():
         print(f"\n=== Summary Across {num_files} Videos ===")
         print(f"Mean velocity across videos: {mean_across:.2f} mm/s")
         print(f"SD of mean velocity across videos: {sd_across:.2f} mm/s")
-        plot_all_velocities(all_velocity, bin_size)
+        all_vel_path = os.path.join(os.path.dirname(video_files[0]), "all_velocities.png")
+        plot_all_velocities(all_velocity, bin_size, save_path=all_vel_path)
     else:
         mean_vel = np.nanmean(all_velocity[0])
         sd_vel = np.nanstd(all_velocity[0])
