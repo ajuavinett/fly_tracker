@@ -149,6 +149,71 @@ def interpolate_pos(array, inter_dist_threshold):
     return result
 
 
+def boundary_filter(array, diameter):
+    """
+    Remove points that fall outside the circular dish.
+    The dish is assumed to be a circle of the given diameter,
+    centered at (diameter/2, diameter/2).
+    """
+    filtered = array.copy()
+    cx, cy = diameter / 2, diameter / 2
+    radius = diameter / 2
+
+    x = filtered[:, 1]
+    y = filtered[:, 2]
+    dist_from_center = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+
+    outside = dist_from_center > radius
+    # Don't count points that are already NaN
+    outside = outside & ~np.isnan(x)
+    filtered[outside, 1:3] = np.nan
+
+    count = np.sum(outside)
+    if count > 0:
+        print(f"  {count} points removed by the boundary filter (outside dish).")
+    return filtered
+
+
+def displacement_filter(array, multiplier=5):
+    """
+    Remove points where the frame-to-frame displacement is much larger
+    than the median displacement. This catches sudden jumps that the
+    teleport filter might miss (e.g., runs of bad frames).
+    """
+    filtered = array.copy()
+    x = filtered[:, 1]
+    y = filtered[:, 2]
+
+    # Compute frame-to-frame displacements
+    dx = np.diff(x)
+    dy = np.diff(y)
+    displacements = np.sqrt(dx ** 2 + dy ** 2)
+
+    # Get median of valid (non-NaN) displacements
+    valid_disp = displacements[~np.isnan(displacements)]
+    if len(valid_disp) == 0:
+        return filtered
+    median_disp = np.nanmedian(valid_disp)
+
+    if median_disp == 0:
+        return filtered
+
+    threshold = median_disp * multiplier
+    count = 0
+
+    # If displacement from frame i to i+1 is too large, NaN out frame i+1
+    for i in range(len(displacements)):
+        if np.isnan(displacements[i]):
+            continue
+        if displacements[i] > threshold:
+            filtered[i + 1, 1:3] = np.nan
+            count += 1
+
+    if count > 0:
+        print(f"  {count} points removed by the displacement filter (>{multiplier}x median jump).")
+    return filtered
+
+
 # ---------------------------------------------------------------------------
 # Video processing
 # ---------------------------------------------------------------------------
@@ -272,7 +337,9 @@ def process_video(video_path, roi, diameter, frame_rate, search_size, per_pixel_
     skipped = np.sum(np.isnan(corrected_array[:, 1]))
     print(f"  {skipped} points skipped out of {nfrm}.")
 
-    # Apply teleport filter and interpolation
+    # Apply filters and interpolation
+    corrected_array = boundary_filter(corrected_array, diameter)
+    corrected_array = displacement_filter(corrected_array)
     corrected_array = dist_filter(corrected_array, 2)
     corrected_array = interpolate_pos(corrected_array, 2)
 
